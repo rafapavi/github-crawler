@@ -1,2 +1,2 @@
 # github-crawler
-Python Script to crawl dat
+Python Script to crawl data
