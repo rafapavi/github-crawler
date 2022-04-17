@@ -94,8 +94,8 @@ def main():
     print("*** STARTED GITHUB PROFILE PARSER ***")
     os.system("docker-compose up -d")
     start_timer = time.time()
-    output_files = ["avalanchego_ava-labs.json"]
-    # scrape_urls(output_files)
+    output_files = []
+    scrape_urls(output_files)
     print("*** STARTED EXCEL FILE GENERATION ***")
     workbook = xlsxwriter.Workbook('github_parse.xlsx')
     for output_file in output_files:
