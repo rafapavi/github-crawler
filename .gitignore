@@ -130,4 +130,6 @@ dmypy.json
 saved_data.csv
 test.txt
 urls.txt
-parsed_github.txt
+parsed_github.json
+github_parse.xlsx
+.DS_Store

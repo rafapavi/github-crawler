@@ -8,5 +8,7 @@ import scrapy
 class GithubCrawlerItem(scrapy.Item):
     github_repo_url = scrapy.Field()
     user_name = scrapy.Field()
+    user_url = scrapy.Field()
     no_of_contributions = scrapy.Field()
     user_repositories = scrapy.Field()
+    user_commits = scrapy.Field()
