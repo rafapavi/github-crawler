@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+saved_data.csv
+test.txt
+urls.txt
+parsed_github.txt
