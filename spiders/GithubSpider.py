@@ -7,10 +7,29 @@ import re
 class GithubSpider(scrapy.Spider):
     name = "github"
     repo_counter = 0
+    file_name = ''
+    
+    custom_settings = {
+        'USER_AGENT': 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)',
+        "FEEDS": {
+            './%(file_name)s.json': {
+                'format': 'json'
+            }
+        },
+        "DOWNLOADER_MIDDLEWARES": {
+            # ...
+            'rotating_proxies.middlewares.RotatingProxyMiddleware': 610,
+            'rotating_proxies.middlewares.BanDetectionMiddleware': 620,
+            # ...
+        },
+        "ROTATING_PROXY_LIST_PATH": 'proxylist.txt'
+    }
 
-    def __init__(self, parsing_url=None, *args, **kwargs):
+    def __init__(self, parsing_url=None, file_name = None, *args, **kwargs):
         super(GithubSpider, self).__init__(*args, **kwargs)
         self.parsing_url = parsing_url
+        self.file_name = file_name
+
 
     def start_requests(self):
         item = GithubCrawlerItem()
@@ -18,6 +37,7 @@ class GithubSpider(scrapy.Spider):
 
     def parse(self, response: HtmlResponse):
         item = response.meta['item']
+        counter = 0
         for repo in response.css("div.repo"):
             user_name = repo.xpath(
                 "a[1][@data-hovercard-type='user']/@href").get()
@@ -25,10 +45,12 @@ class GithubSpider(scrapy.Spider):
                 item["user_name"] = user_name.lstrip("/")
                 item["user_url"] = _get_user_profile(user_name)
                 yield scrapy.Request(item["user_url"], callback=self.parse_user_profile, meta={"item": item.copy()})
+                counter += 1
+                if (counter == 10):
+                    break
 
     def parse_user_profile(self, response):
         item = response.meta['item']
-        print ("parse_user_profile", item)
         contribution_div = response.css("div.js-yearly-contributions")
         item["no_of_contributions"] = _clean_contributions_str(
             contribution_div.css("h2.f4.text-normal.mb-2::text").get())
@@ -37,12 +59,8 @@ class GithubSpider(scrapy.Spider):
     def parse_user_repositories(self, response):
         item = response.meta['item']
         repo_urls = []
-        count = 0
         for repo in response.css("h3.wb-break-all"):
             repo_urls.append(_get_full_repo_url(repo.xpath("a/@href").get()))
-            count += 1
-            if (count == 5):
-                break
 
         item["user_repositories"] = repo_urls
         yield scrapy.Request(_get_github_commit_page(item["user_repositories"][0]), callback=self.parse_user_commits, meta={"item": item.copy(), "repo_counter": 0})
@@ -56,12 +74,11 @@ class GithubSpider(scrapy.Spider):
 
         for commit in response.css("li.js-commits-list-item"):
             if (item["user_name"] in commit.css("a.commit-author.user-mention::text").extract()):
-                print ("repo_counter", repo_counter, item["user_repositories"])
                 item["user_commits"][item["user_repositories"][repo_counter]] = _get_commit_hash(commit.attrib["data-url"])
                 break
         
         repo_counter += 1
-        if (repo_counter < len(item["user_repositories"])):
+        if (repo_counter < len(item["user_repositories"]) and len(item["user_commits"].keys()) == 0):
             yield scrapy.Request(_get_github_commit_page(item["user_repositories"][repo_counter]), callback=self.parse_user_commits, meta={"item": item.copy(), "repo_counter": repo_counter})
         else:
             yield item

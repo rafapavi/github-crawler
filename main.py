@@ -1,7 +1,9 @@
 import os
 import time
 import json
-from scrapy.crawler import CrawlerProcess
+from scrapy.crawler import CrawlerProcess, CrawlerRunner
+from twisted.internet import reactor
+from scrapy.utils.log import configure_logging
 from spiders.GithubSpider import GithubSpider
 import xlsxwriter
 from pydriller import Git
@@ -59,40 +61,38 @@ def create_excel_sheet(worksheet, parsed_info):
 
 def clean_up_files(output_files):
     for f in output_files:
-        os.remove(f)
+        os.remove(f"{f}.json")
 
 
 def scrape_urls(output_files):
     print("*** STARTED SCRAPING URLS ***")
+
+    configure_logging()
+    process = CrawlerRunner()
     with open("urls.txt", "r") as url_file:
         for url in url_file.readlines():
-            url_split = url.split('/')
-            output_file_name = f"{url_split[-1]}_{url_split[-2]}.json"
+            print (f"*** STARTED SCRAPING URL: {url} ***")
+            url_split = [i.replace('\n', '') for i in url.split('/')]
+            output_file_name = f"{url_split[-1]}_{url_split[-2]}"
             output_files.append(output_file_name)
-            process = CrawlerProcess(settings={
-                'USER_AGENT': 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)',
-                "FEEDS": {
-                    output_file_name: {
-                        'format': 'json'
-                    }
-                },
-                "DOWNLOADER_MIDDLEWARES": {
-                    # ...
-                    'rotating_proxies.middlewares.RotatingProxyMiddleware': 610,
-                    'rotating_proxies.middlewares.BanDetectionMiddleware': 620,
-                    # ...
-                },
-                "ROTATING_PROXY_LIST_PATH": 'proxylist.txt'
-            })
-            process.crawl(GithubSpider, parsing_url=url)
-            process.start()
+            process.crawl(GithubSpider, parsing_url=url, file_name=output_file_name)
             time.sleep(1)
+            print (f"*** FINISHED SCRAPING URL: {url} ***")
+        deferred = process.join()
+        deferred.addBoth(lambda _: reactor.stop())
+        reactor.run() 
+
     print("*** FINISHED SCRAPING URLS ***")
 
+def get_worksheet_name(name: str):
+    if (len(name) > 30):
+        return name[:31]
+    return name
 
 def main():
     print("*** STARTED GITHUB PROFILE PARSER ***")
     os.system("docker-compose up -d")
+    time.sleep(5)
     start_timer = time.time()
     output_files = []
     scrape_urls(output_files)
@@ -100,9 +100,9 @@ def main():
     workbook = xlsxwriter.Workbook('github_parse.xlsx')
     for output_file in output_files:
         print(f"*** STARTED FILE {output_file} ***")
-        with open(output_file, "r") as f:
+        with open(f"{output_file}.json", "r") as f:
             parsed_info = json.load(f)
-            worksheet = workbook.add_worksheet(name=output_file)
+            worksheet = workbook.add_worksheet(name=get_worksheet_name(output_file))
             create_excel_sheet(worksheet, parsed_info)
         print(f"*** FINISHED FILE {output_file} ***")
     workbook.close()
@@ -110,7 +110,7 @@ def main():
     print("*** FINSHED GITHUB PROFILE PARSER ***")
 
     print("*** CLEANING UP DIRECTORY ***")
-    clean_up_files(output_files)
+    # clean_up_files(output_files)
 
     time_taken = time.time() - start_timer
     print("** STATS **")

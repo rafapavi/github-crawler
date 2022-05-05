@@ -1,0 +1,12 @@
+GitPython==3.1.27
+PyDriller==2.1
+python-git==2018.2.1
+requests==2.27.1
+requests-file==1.5.1
+Scrapy==2.6.1
+scrapy-rotating-proxies==0.6.2
+tldextract==3.2.1
+toripchanger==1.1.4
+Twisted==22.4.0
+urllib3==1.26.9
+XlsxWriter==3.0.3
